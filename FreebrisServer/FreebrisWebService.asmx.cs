@@ -4,8 +4,11 @@ using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Net;
+using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using System.Web;
 using System.Web.Services;
 
@@ -83,6 +86,58 @@ namespace FreebrisServer
                 return true;
             }
             return false;
+        }
+
+        [WebMethod]
+        public bool ChangePassword(string username, string password)
+        {
+            SqlConnection connection = new SqlConnection();
+
+            //SqlCommand cmd = new SqlCommand("update password FROM Users WHERE username = \'" + username + "\'", connection);
+            SqlCommand cmd = new SqlCommand("update Users set password=@password WHERE username = \'" + username + "\'", connection);
+
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+
+            var sha = SHA256.Create();
+            var asByteArray = Encoding.Default.GetBytes(password);
+            var hashedPassword = sha.ComputeHash(asByteArray);
+            cmd.Parameters.AddWithValue("@password", Convert.ToBase64String(hashedPassword));
+
+            try
+            {
+                cmd.ExecuteNonQuery();
+            }
+            catch
+            {
+                connection.Close();
+                return false;
+            }
+            connection.Close();
+            return true;
+        }
+
+        [WebMethod]
+        public void SendEmail(string email, string subject, string text)
+        {
+            string fromMail = "ahs.sarah.2002@gmail.com";
+            string fromPassword = "hjbxeikvbuxbdfpd";
+
+           MailMessage message = new MailMessage();
+            message.From = new MailAddress(fromMail);
+            message.Subject = subject;
+            message.To.Add(new MailAddress(email));
+            message.Body = text;
+            message.IsBodyHtml = false;
+
+            var smtpClient = new SmtpClient("smtp.gmail.com")
+            {
+                Port = 587,
+                Credentials = new NetworkCredential(fromMail, fromPassword),
+                EnableSsl = true,
+            };
+
+            smtpClient.Send(message);
         }
 
         private int GetId(string tableName)
