@@ -4,6 +4,8 @@ using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Web;
 using System.Web.Services;
 
@@ -61,6 +63,7 @@ namespace FreebrisServer
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
             connection.Open();
             SqlDataReader dr = cmd.ExecuteReader();
+            byte[] hashedPassword = {};
 
             string pass = "";
             if (dr.HasRows)
@@ -69,10 +72,13 @@ namespace FreebrisServer
                 {
                     pass = dr.GetString(0);
                     pass = pass.Trim();
+                    var sha = SHA256.Create();
+                    var asByteArray = Encoding.Default.GetBytes(password);
+                    hashedPassword = sha.ComputeHash(asByteArray);
                 }
             }
 
-            if (pass == password)
+            if (pass.Equals(Convert.ToBase64String(hashedPassword)))
             {
                 return true;
             }
@@ -101,7 +107,7 @@ namespace FreebrisServer
         public void AddUserToDB(int id, string username, string password, string email)
         {
             SqlConnection connection = new SqlConnection();
-            SqlCommand cmd = new SqlCommand("INSERT INTO Users VALUES ('" + id + "', '" + username + "', '" + password + "', '" + 0  + "', '" + "admin','" + 1 + "', '" + email + "')", connection);
+            SqlCommand cmd = new SqlCommand("INSERT INTO Users VALUES ('" + id + "', '" + username + "', '" + password + "', '" + 0  + "', '" + "admin', '" + 1 + "', '" + email + "')", connection);
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
             connection.Open();
             cmd.ExecuteReader();
@@ -115,7 +121,7 @@ namespace FreebrisServer
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
             connection.Open();
             SqlDataReader dr = cmd.ExecuteReader();
-
+            byte[] hashedPassword;
             if (dr.HasRows)
             {
                 //while (dr.Read())
@@ -128,8 +134,10 @@ namespace FreebrisServer
             {
                 int id = GetId("Users");
                 //string email = username + "@gmail.com";
-
-                AddUserToDB(id, username, password, email);
+                var sha = SHA256.Create();
+                var asByteArray = Encoding.Default.GetBytes(password);
+                hashedPassword = sha.ComputeHash(asByteArray);
+                AddUserToDB(id, username, Convert.ToBase64String(hashedPassword), email);
             }
             return true;
         }
