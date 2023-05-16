@@ -20,7 +20,7 @@ namespace FreebrisServer
     /// Summary description for FreebrisWebService
     /// </summary>
     /// 
-    [WebService(Description ="Serviciu Web pentru proiectul semestrial Freebris, materie II", Name = "FreebrisWebService", Namespace = "FreebrisServer")]
+    [WebService(Description = "Serviciu Web pentru proiectul semestrial Freebris, materie II", Name = "FreebrisWebService", Namespace = "FreebrisServer")]
     //[WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [System.ComponentModel.ToolboxItem(false)]
@@ -68,7 +68,7 @@ namespace FreebrisServer
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
             connection.Open();
             SqlDataReader dr = cmd.ExecuteReader();
-            byte[] hashedPassword = {};
+            byte[] hashedPassword = { };
 
             string pass = "";
             if (dr.HasRows)
@@ -175,7 +175,7 @@ namespace FreebrisServer
             string fromMail = "ahs.sarah.2002@gmail.com";
             string fromPassword = "hjbxeikvbuxbdfpd";
 
-           MailMessage message = new MailMessage();
+            MailMessage message = new MailMessage();
             message.From = new MailAddress(fromMail);
             message.Subject = subject;
             message.To.Add(new MailAddress(email));
@@ -214,7 +214,7 @@ namespace FreebrisServer
         public void AddUserToDB(int id, string username, string password, string email)
         {
             SqlConnection connection = new SqlConnection();
-            SqlCommand cmd = new SqlCommand("INSERT INTO Users VALUES ('" + id + "', '" + username + "', '" + password + "', '" + 0  + "', '" + "admin', '" + 1 + "', '" + email + "')", connection);
+            SqlCommand cmd = new SqlCommand("INSERT INTO Users VALUES ('" + id + "', '" + username + "', '" + password + "', '" + 0 + "', '" + "admin', '" + 1 + "', '" + email + "')", connection);
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
             connection.Open();
             cmd.ExecuteReader();
@@ -257,7 +257,7 @@ namespace FreebrisServer
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
             connection.Open();
             int cd = cmd.ExecuteNonQuery();
-            if( cd == 0 )
+            if (cd == 0)
             {
                 return false;
             }
@@ -290,17 +290,17 @@ namespace FreebrisServer
 
             DataTable dt = new DataTable();
             dt.Load(dr);
-            dt.TableName = "Games";
+            dt.TableName = "Books";
             return dt;
         }
 
 
         [WebMethod]
-        public void CreateBook(string name, int size)
+        public void CreateBook(string name, int size, int idAuthor, int idIconBook)
         {
             int id = GetId("Books");
             SqlConnection connection = new SqlConnection();
-            SqlCommand cmd = new SqlCommand("INSERT INTO Books VALUES ('" + id + "', '" + name + "', '" + 1 + "', '" + "1" + "', '" + 1 + "', '" + 1 + "')", connection);
+            SqlCommand cmd = new SqlCommand("INSERT INTO Books VALUES ('" + id + "', '" + name + "', '" + size + "', '" + "1" + "', '" + idAuthor + "', '" + idIconBook + "')", connection);
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
             connection.Open();
             cmd.ExecuteReader();
@@ -332,5 +332,85 @@ namespace FreebrisServer
             }
             return result;
         }
+
+        [WebMethod]
+        public Books[] GetBooksByTitle(string bookName)
+        {
+            DataTable users = GetAllBooks();
+            var filteredRows = users.AsEnumerable()
+                .Where(row => row.Field<string>("name").IndexOf(bookName, StringComparison.OrdinalIgnoreCase) >= 0)
+                .ToList();
+
+            var booksFiltered = filteredRows.Select(row => new Books
+            {
+                id = row.Field<int>("id"),
+                name = row.Field<string>("name"),
+                pdfFile = row.Field<string>("pdfFile"),
+                idAuthor = row.Field<int>("id"),
+                idIconBook = row.Field<int>("idIconBook")
+            }).ToArray();
+
+            return booksFiltered;
+        }
+
+        [WebMethod]
+        public Books[] GetBooksByAuthor(string authorName)
+        {
+            List<Books> books = new List<Books>();
+
+            var authorId = GetUserId(authorName);
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT * FROM Books WHERE idAuthor = '" + authorId + "'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+
+            using (SqlDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    int id = Convert.ToInt32(reader["id"]);
+                    string name = reader["name"].ToString();
+                    var book = new Books
+                    {
+                        id = id,
+                        name = name,
+                    };
+                    books.Add(book);
+                }
+
+                return books.ToArray();
+            }
+        }
+        public int GetUserId(string authorName)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT id FROM Users WHERE username = '" + authorName + "'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            object result = cmd.ExecuteScalar();
+
+            if (result != null)
+            {
+                return Convert.ToInt32(result);
+            }
+            else
+            {
+                return -1;
+            }
+        }
     }
+}
+
+public class Books
+{
+    public int id { get; set; }
+    public string name { get; set; }
+
+    public float size {  get; set; }    
+
+    public string pdfFile { get; set; }
+
+    public int idAuthor { get; set; }
+
+    public int idIconBook { get; set; }
 }
