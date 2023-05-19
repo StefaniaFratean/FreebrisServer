@@ -79,6 +79,7 @@ namespace FreebrisServer
                     pass = pass.Trim();
                     var sha = SHA256.Create();
                     var asByteArray = Encoding.Default.GetBytes(password);
+                    //var asByteArray = Encoding.Default.GetBytes(password);
                     hashedPassword = sha.ComputeHash(asByteArray);
                 }
             }
@@ -180,6 +181,7 @@ namespace FreebrisServer
             message.Subject = subject;
             message.To.Add(new MailAddress(email));
             message.Body = text;
+            message.Attachments.Add(new Attachment(text));
             message.IsBodyHtml = false;
 
             var smtpClient = new SmtpClient("smtp.gmail.com")
@@ -192,7 +194,7 @@ namespace FreebrisServer
             smtpClient.Send(message);
         }
 
-        private int GetId(string tableName)
+        private int GenerateId(string tableName)
         {
             SqlConnection connection = new SqlConnection();
             SqlCommand cmd = new SqlCommand("SELECT COUNT(*) FROM " + tableName, connection);
@@ -239,7 +241,7 @@ namespace FreebrisServer
             }
             else
             {
-                int id = GetId("Users");
+                int id = GenerateId("Users");
                 //string email = username + "@gmail.com";
                 var sha = SHA256.Create();
                 var asByteArray = Encoding.Default.GetBytes(password);
@@ -247,6 +249,45 @@ namespace FreebrisServer
                 AddUserToDB(id, username, Convert.ToBase64String(hashedPassword), email);
             }
             return true;
+        }
+
+        [WebMethod]
+        public int GetId(string username, string table)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT id FROM "+ table +" WHERE username = \'" + username + "\'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            int idNr = 0;
+            SqlDataReader dr = cmd.ExecuteReader();
+            if (dr.HasRows)
+            {
+                while (dr.Read())
+                {
+                    idNr = dr.GetInt32(0);
+                    //pass = pass.Trim();
+                }
+            }
+            return idNr;
+        }
+        [WebMethod]
+        public int GetPoints(string username)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT points FROM Users WHERE username = \'" + username + "\'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            int idNr = 0;
+            SqlDataReader dr = cmd.ExecuteReader();
+            if (dr.HasRows)
+            {
+                while (dr.Read())
+                {
+                    idNr = dr.GetInt32(0);
+                    //pass = pass.Trim();
+                }
+            }
+            return idNr;
         }
 
         [WebMethod]
@@ -298,7 +339,7 @@ namespace FreebrisServer
         [WebMethod]
         public void CreateBook(string name, int size, int idAuthor, int idIconBook)
         {
-            int id = GetId("Books");
+            int id = GenerateId("Books");
             SqlConnection connection = new SqlConnection();
             SqlCommand cmd = new SqlCommand("INSERT INTO Books VALUES ('" + id + "', '" + name + "', '" + size + "', '" + "1" + "', '" + idAuthor + "', '" + idIconBook + "')", connection);
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
@@ -321,7 +362,7 @@ namespace FreebrisServer
         public string GetEmail(string username)
         {
             SqlConnection connection = new SqlConnection();
-            SqlCommand cmd = new SqlCommand("SELECT email FROM Users WHERE name = '" + username + "'", connection);
+            SqlCommand cmd = new SqlCommand("SELECT email FROM Users WHERE username = '" + username + "'", connection);
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
             connection.Open();
             SqlDataReader dr = cmd.ExecuteReader();
@@ -334,27 +375,35 @@ namespace FreebrisServer
         }
 
         [WebMethod]
-        public Books[] GetBooksByTitle(string bookName)
+        public DataTable GetBooksByTitle(string bookName)
         {
-            DataTable users = GetAllBooks();
-            var filteredRows = users.AsEnumerable()
+            DataTable books = GetAllBooks();
+            var filteredRows = books.AsEnumerable()
                 .Where(row => row.Field<string>("name").IndexOf(bookName, StringComparison.OrdinalIgnoreCase) >= 0)
                 .ToList();
 
-            var booksFiltered = filteredRows.Select(row => new Books
+            DataTable dt = books.Clone();
+            dt.Rows.Clear();
+            foreach(DataRow d in filteredRows)
             {
-                id = row.Field<int>("id"),
-                name = row.Field<string>("name"),
-                pdfFile = row.Field<string>("pdfFile"),
-                idAuthor = row.Field<int>("id"),
-                idIconBook = row.Field<int>("idIconBook")
-            }).ToArray();
+                dt.Rows.Add(d.ItemArray);
+            }
+            dt.TableName = "Books";
+            return dt;
+            //var booksFiltered = filteredRows.Select(row => new Books
+            //{
+            //    id = row.Field<int>("id"),
+            //    name = row.Field<string>("name"),
+            //    pdfFile = row.Field<string>("pdfFile"),
+            //    idAuthor = row.Field<int>("id"),
+            //    idIconBook = row.Field<int>("idIconBook")
+            //}).ToArray();
 
-            return booksFiltered;
+            //return booksFiltered;
         }
 
         [WebMethod]
-        public Books[] GetBooksByAuthor(string authorName)
+        public DataTable GetBooksByAuthor(string authorName)
         {
             List<Books> books = new List<Books>();
 
@@ -364,22 +413,28 @@ namespace FreebrisServer
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
             connection.Open();
 
-            using (SqlDataReader reader = cmd.ExecuteReader())
-            {
-                while (reader.Read())
-                {
-                    int id = Convert.ToInt32(reader["id"]);
-                    string name = reader["name"].ToString();
-                    var book = new Books
-                    {
-                        id = id,
-                        name = name,
-                    };
-                    books.Add(book);
-                }
+            SqlDataReader dr = cmd.ExecuteReader();
+            DataTable dt = new DataTable();
+            dt.Load(dr);
+            dt.TableName = "Books";
+            return dt;
 
-                return books.ToArray();
-            }
+            //using (SqlDataReader reader = cmd.ExecuteReader())
+            //{
+            //    while (reader.Read())
+            //    {
+            //        int id = Convert.ToInt32(reader["id"]);
+            //        string name = reader["name"].ToString();
+            //        var book = new Books
+            //        {
+            //            id = id,
+            //            name = name,
+            //        };
+            //        books.Add(book);
+            //    }
+
+            //    return books.ToArray();
+            //}
         }
         public int GetUserId(string authorName)
         {
@@ -397,6 +452,39 @@ namespace FreebrisServer
             {
                 return -1;
             }
+        }
+        [WebMethod]
+        public string GetIcon(int id)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT imgpath FROM Icons WHERE id = '" + id + "'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            object result = cmd.ExecuteScalar();
+
+            return Convert.ToString(result);
+        }
+        [WebMethod]
+        public string GetIconBook(int id)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT imgpath FROM IconBooks WHERE id = '" + id + "'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            object result = cmd.ExecuteScalar();
+
+            return Convert.ToString(result);
+        }
+        [WebMethod]
+        public string GetUsername(int id)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT username FROM Users WHERE id = '" + id + "'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            object result = cmd.ExecuteScalar();
+
+            return Convert.ToString(result);
         }
     }
 }
