@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
+using System.Drawing;
 using System.Linq;
 using System.Net;
 using System.Net.Mail;
@@ -146,28 +147,19 @@ namespace FreebrisServer
         }
 
         [WebMethod]
-        public int AddPoints(string id, int points)
+        public void AddPoints(int id, double points)
         {
-            //still in lucru
             SqlConnection connection = new SqlConnection();
             SqlCommand OldPoints = new SqlCommand("SELECT points From Users WHERE id = '" + id + "'", connection);
-            SqlCommand cmd = new SqlCommand("UPDATE Users SET points = '" + points + "' WHERE id = '" + id + "'", connection);
             connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
             connection.Open();
-            SqlDataReader dr = OldPoints.ExecuteReader();
+            double currentPoints = (double)OldPoints.ExecuteScalar();
+            double updatedPoints = currentPoints + points;
 
+            SqlCommand cmd = new SqlCommand("UPDATE Users SET points = '" + points + "' WHERE id = '" + id + "'", connection);
 
-            int pt = 0;
-            if (dr.HasRows)
-            {
-                while (dr.Read())
-                {
-                    pt = dr.GetInt32(0) + points;
-                    return dr.GetInt32(dr.GetOrdinal(points.ToString()));
-                }
-            }
-
-            return pt;
+            cmd.Parameters.AddWithValue("@points", updatedPoints);
+            cmd.ExecuteNonQuery();
         }
 
         [WebMethod]
@@ -453,6 +445,25 @@ namespace FreebrisServer
                 return -1;
             }
         }
+        public int GetBookId(string bookTitle)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT id FROM Books WHERE name = '" + bookTitle + "'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            object result = cmd.ExecuteScalar();
+
+            if (result != null)
+            {
+                return Convert.ToInt32(result);
+            }
+            else
+            {
+                return -1;
+            }
+        }
+
+
         [WebMethod]
         public string GetIcon(int id)
         {
@@ -485,6 +496,97 @@ namespace FreebrisServer
             object result = cmd.ExecuteScalar();
 
             return Convert.ToString(result);
+        }
+
+        [WebMethod]
+        public DataTable GetDownloadedBooksByUser(int id)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT * FROM Downloads WHERE idUser = '" + id + "'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            SqlDataReader dr = cmd.ExecuteReader();
+
+            DataTable dt = new DataTable();
+            dt.Load(dr);
+            dt.TableName = "Downloads";
+            return dt;
+        }
+
+        [WebMethod]
+        public void SetIcon(int id, int idIcon)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("UPDATE Users SET idIcon = '" + idIcon + "' WHERE id = '" + id + "'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            cmd.ExecuteReader();
+        }
+
+        [WebMethod]
+        public DataTable GetAllIcons()
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT * FROM Icons", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            SqlDataReader dr = cmd.ExecuteReader();
+
+            DataTable dt = new DataTable();
+            dt.Load(dr);
+            dt.TableName = "Icons";
+            return dt;
+        }
+
+        [WebMethod]
+        public bool CreateReview(int bookId, int userId, string text)
+        {
+            try
+            {
+               int id = GenerateId("Reviews");
+                SqlConnection connection = new SqlConnection();
+                SqlCommand cmd = new SqlCommand("INSERT INTO Reviews VALUES ('" + id + "', '" + bookId + "', '" + userId + "', '" + text + "', '" + "1" + "')", connection);
+                connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+                connection.Open();
+                cmd.ExecuteReader();
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            AddPoints(userId, 5);
+            return true;
+        }
+
+        [WebMethod]
+        public bool DeleteReview(int bookId, int userId, string text)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("DELETE FROM Reviews WHERE bookId = \'" + bookId + "\' AND userId = \'" + userId + "\' AND text = \'" + text + "\'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            int cd = cmd.ExecuteNonQuery();
+            if (cd == 0)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        [WebMethod]
+        public DataTable GetAllReviewForBook( string bookTitle)
+        {
+            SqlConnection connection = new SqlConnection();
+            int bookId = GetBookId(bookTitle);
+            SqlCommand cmd = new SqlCommand("SELECT * FROM Reviews WHERE bookId = \'" + bookId + "\'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            SqlDataReader dr = cmd.ExecuteReader();
+
+            DataTable dt = new DataTable();
+            dt.Load(dr);
+            dt.TableName = "Reviews";
+            return dt;
         }
     }
 }
