@@ -538,6 +538,20 @@ namespace FreebrisServer
 
             return Convert.ToString(result);
         }
+
+        [WebMethod]
+        public int GetIconForUser(string username)
+        {
+            SqlConnection connection = new SqlConnection();
+            SqlCommand cmd = new SqlCommand("SELECT idIcon FROM Users WHERE username = '" + username + "'", connection);
+            connection.ConnectionString = ConfigurationManager.ConnectionStrings["ConnectionWebService"].ToString();
+            connection.Open();
+            object result = cmd.ExecuteScalar();
+
+            return int.Parse(result.ToString());
+        }
+
+
         [WebMethod]
         public string GetUsername(int id)
         {
